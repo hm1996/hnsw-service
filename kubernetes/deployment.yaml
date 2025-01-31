@@ -21,7 +21,7 @@ spec:
             - name: DATABASE_HOST
               value: postgres-service.svc.default.cluster.local
             - name: DATABASE_PORT
-              value: 5432
+              value: "5432"
             - name: DATABASE_USER
               value: postgres
             - name: DATABASE_PASSWORD
