@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hnsw-as-a-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hnsw
+  template:
+    metadata:
+      labels:
+        app: hnsw
+    spec:
+      containers:
+        - name: fastapi
+          image: 10.101.123.76:80/hnsw-as-a-service:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_HOST
+              value: postgres-service.svc.default.cluster.local
+            - name: DATABASE_PORT
+              value: 5432
+            - name: DATABASE_USER
+              value: postgres
+            - name: DATABASE_PASSWORD
+              value: admin

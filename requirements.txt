@@ -1,0 +1,5 @@
+fastapi
+hnswlib
+numpy
+uvicorn
+psycopg2-binary

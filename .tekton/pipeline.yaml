@@ -1,0 +1,86 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: labelstudio-pipeline
+spec:
+  workspaces:
+    - name: shared-repository
+      description: | 
+        This workspace contains the cloned repo files, so they can be read by the
+        next task.
+    - name: git-credentials
+      description: SSH credentials from secret
+  params:
+    - name: BRANCH_OVERRIDE
+      type: string
+      default: ""
+    - name: GITHUB_REPO_URL
+      type: string
+      default: ""
+    - name: SOURCE_REVISION
+      type: string
+      default: develop
+    - name: REGISTRY_URL
+      type: string
+      default: registry.kube-system.svc.cluster.local:80
+    - name: IMAGE_NAME
+      type: string
+      default: hsnw-as-a-service
+  tasks:
+    - name: repository-clone
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-repository
+        - name: ssh-directory
+          workspace: git-credentials
+      params:
+        - name: url
+          value: $(params.GITHUB_REPO_URL)
+        - name: revision
+          value: $(params.SOURCE_REVISION)
+    - name: docker-build
+      taskRef:
+          name: docker-build
+      runAfter:
+        - repository-clone
+      workspaces:
+        - name: source
+          workspace: shared-repository
+      params:
+        - name: image
+          value: $(params.REGISTRY_URL)/$(params.IMAGE_NAME):latest
+        - name: dockerfile
+          value: ./Dockerfile
+        - name: insecure_registry
+          value: $(params.REGISTRY_URL)
+    - name: grype-check
+      taskRef:
+        name: grype
+      runAfter:
+        - docker-build
+      params:
+        - name: GRYPE_IMAGE
+          value: anchore/grype:latest
+        - name: ARGS
+          value: 
+            - $(params.REGISTRY_URL)/$(params.IMAGE_NAME):latest
+            - --fail-on=high
+    - name: helm-release
+      runAfter:
+        - grype-check
+      workspaces:
+        - name: source
+          workspace: shared-repository
+      taskRef:
+        name: kubernetes-actions
+      params:
+        - name: script
+          value: |
+            kubectl get deployments 
+            echo "----------- Create ----------"
+            kubectl apply -f ./kubernetes
+            echo "----------- Rollout ----------"
+            kubectl rollout restart deployment/hnsw-as-a-service
+            kubectl rollout restart deployment/postgres
